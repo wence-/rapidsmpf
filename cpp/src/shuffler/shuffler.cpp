@@ -103,11 +103,12 @@ std::unique_ptr<Buffer> allocate_buffer(
  *
  * @return The actual amount of data successfully spilled from the postbox.
  */
+template <typename T>
 std::size_t postbox_spilling(
     BufferResource* br,
     Communicator::Logger& log,
     rmm::cuda_stream_view stream,
-    PostBox& postbox,
+    PostBox<T>& postbox,
     std::size_t amount
 ) {
     RAPIDSMPF_NVTX_FUNC_RANGE();
@@ -381,6 +382,8 @@ Shuffler::Shuffler(
       partition_owner{partition_owner},
       stream_{stream},
       br_{br},
+      inbox_{[&](PartID x) { return partition_owner(comm_, x); }},
+      outbox_{[](PartID x) { return x; }},
       comm_{std::move(comm)},
       progress_thread_{std::move(progress_thread)},
       op_id_{op_id},
