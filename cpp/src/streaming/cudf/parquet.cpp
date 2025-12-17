@@ -24,6 +24,8 @@
 #include <rapidsmpf/streaming/cudf/parquet.hpp>
 #include <rapidsmpf/streaming/cudf/table_chunk.hpp>
 
+#include "hybrid_scan.hpp"
+
 namespace rapidsmpf::streaming::node {
 namespace {
 
@@ -44,9 +46,22 @@ Message read_parquet_chunk(
     cudf::io::parquet_reader_options options,
     std::uint64_t sequence_number
 ) {
-    auto result = std::make_unique<TableChunk>(
-        cudf::io::read_parquet(options, stream, ctx->br()->device_mr()).tbl, stream
-    );
+    auto result = [&]() {
+        if (options.get_filter().has_value() and options.get_source().num_sources() == 1)
+        {
+            // TODO: Ensure the leaf nodes in the AST filter expression tree are of the
+            // form: `column_named_reference op literal` until PR
+            // https://github.com/rapidsai/cudf/pull/20604 is merged
+            return std::make_unique<TableChunk>(
+                hybrid_scan(options, stream, ctx->br()->device_mr()), stream
+            );
+        } else {
+            return std::make_unique<TableChunk>(
+                cudf::io::read_parquet(options, stream, ctx->br()->device_mr()).tbl,
+                stream
+            );
+        }
+    }();
     return to_message(sequence_number, std::move(result));
 }
 
