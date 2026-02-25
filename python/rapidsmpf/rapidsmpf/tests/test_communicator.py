@@ -75,7 +75,7 @@ def test_single_process() -> None:
 
 def test_logger_weakref_raises() -> None:
     def get_logger() -> Logger:
-        comm = single_process_comm(Options())
+        comm = single_process_comm(Options(), ProgressThread())
         return comm.logger
 
     with pytest.raises(RuntimeError):
