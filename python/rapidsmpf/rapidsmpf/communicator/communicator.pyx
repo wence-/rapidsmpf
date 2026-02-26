@@ -6,6 +6,8 @@ from libcpp.memory cimport shared_ptr
 from libcpp.string cimport string
 from libcpp.utility cimport move
 
+from rapidsmpf.progress_thread cimport ProgressThread
+
 
 # Since a rapids::Communicator::Logger doesn't have a default ctor, we use
 # these C++ functions to call the logger instance. This way Cython doesn't
@@ -161,6 +163,19 @@ cdef class Communicator:
             The rank.
         """
         return deref(self._handle).rank()
+
+    @property
+    def progress_thread(self):
+        """
+        Get the progress thread for this communicator.
+
+        Returns
+        -------
+        Progress thread.
+        """
+        cdef ProgressThread pt = ProgressThread.__new__(ProgressThread)
+        pt._handle = deref(self._handle).progress_thread()
+        return pt
 
     @property
     def nranks(self):
