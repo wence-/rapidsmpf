@@ -4,6 +4,7 @@
  */
 
 #include <functional>
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -541,7 +542,6 @@ int main(int argc, char** argv) {
 
     // Initialize configuration options from environment variables.
     rapidsmpf::config::Options options{rapidsmpf::config::get_environment_variables()};
-
     set_current_rmm_resource(args.rmm_mr);
     auto stat_enabled_mr = set_device_mem_resource_with_stats();
 

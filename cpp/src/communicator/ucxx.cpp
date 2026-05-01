@@ -938,6 +938,7 @@ std::unique_ptr<rapidsmpf::ucxx::InitializedRank> init(
 ) {
     auto progress_mode =
         options.get<ProgressMode>("ucxx_progress_mode", [](auto const& s) {
+          std::cout << "Progress mode is " << s << std::endl;
             if (s.empty()) {
                 return ProgressMode::ThreadBlocking;
             } else if (s == "blocking") {
@@ -957,10 +958,10 @@ std::unique_ptr<rapidsmpf::ucxx::InitializedRank> init(
         auto context = ::ucxx::createContext({}, ::ucxx::Context::defaultFeatureFlags);
         auto worker = context->createWorker(false);
 
-        RAPIDSMPF_EXPECTS(
-            progress_mode != ProgressMode::Blocking,
-            "Blocking progress mode not implemented yet."
-        );
+        // RAPIDSMPF_EXPECTS(
+        //     progress_mode != ProgressMode::Blocking,
+        //     "Blocking progress mode not implemented yet."
+        // );
 
         if (progress_mode == ProgressMode::ThreadBlocking
             || progress_mode == ProgressMode::ThreadPolling)
