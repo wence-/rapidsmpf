@@ -243,29 +243,33 @@ Duration run(
     std::vector<std::unique_ptr<Communicator::Future>> futures;
 
     barrier(comm);
+    auto const rank = comm->rank();
+    auto const size = comm->nranks();
     auto const t0_elapsed = Clock::now();
     decltype(t0_elapsed - t0_elapsed) time;
     {
         RAPIDSMPF_NVTX_SCOPED_RANGE("Alltoall");
-        for (std::uint64_t i = 0; i < args.num_ops; ++i) {
-            for (Rank rank = 0; rank < static_cast<Rank>(comm->nranks()); ++rank) {
+        for (std::uint64_t n = 0; n < args.num_ops; ++n) {
+            for (Rank i = 0; i < static_cast<Rank>(comm->nranks()); ++i) {
+                auto dst = (rank + i) % size;
                 auto buf = std::move(recv_bufs.at(
-                    static_cast<std::uint64_t>(rank)
-                    + i * static_cast<std::uint64_t>(comm->nranks())
+                    static_cast<std::uint64_t>(dst)
+                    + n * static_cast<std::uint64_t>(comm->nranks())
                 ));
-                if (rank != comm->rank()) {
+                if (dst != comm->rank()) {
                     statistics->add_bytes_stat("all-to-all-recv", buf->size);
-                    futures.push_back(comm->recv(rank, tag, std::move(buf)));
+                    futures.push_back(comm->recv(dst, tag, std::move(buf)));
                 }
             }
-            for (Rank rank = 0; rank < static_cast<Rank>(comm->nranks()); ++rank) {
+            for (Rank i = 0; i < static_cast<Rank>(comm->nranks()); ++i) {
+                auto dst = (rank - i + size) % size;
                 auto buf = std::move(send_bufs.at(
-                    static_cast<std::uint64_t>(rank)
-                    + i * static_cast<std::uint64_t>(comm->nranks())
+                    static_cast<std::uint64_t>(dst)
+                    + n * static_cast<std::uint64_t>(comm->nranks())
                 ));
-                if (rank != comm->rank()) {
+                if (dst != comm->rank()) {
                     statistics->add_bytes_stat("all-to-all-send", buf->size);
-                    futures.push_back(comm->send(std::move(buf), rank, tag));
+                    futures.push_back(comm->send(std::move(buf), dst, tag));
                 }
             }
         }
