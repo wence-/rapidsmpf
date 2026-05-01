@@ -20,6 +20,7 @@
 #include <rapidsmpf/error.hpp>
 #include <rapidsmpf/memory/buffer_resource.hpp>
 #include <rapidsmpf/memory/pinned_memory_resource.hpp>
+#include <rapidsmpf/nvtx.hpp>
 #include <rapidsmpf/progress_thread.hpp>
 #include <rapidsmpf/statistics.hpp>
 #include <rapidsmpf/utils/string.hpp>
@@ -229,34 +230,38 @@ Duration run(
     // Sync before we start the timer.
     RAPIDSMPF_CUDA_TRY(cudaDeviceSynchronize());
 
-    auto const t0_elapsed = Clock::now();
-
     Tag const tag{0, 0};
     std::vector<std::unique_ptr<Communicator::Future>> futures;
-    for (std::uint64_t i = 0; i < args.num_ops; ++i) {
-        for (Rank rank = 0; rank < static_cast<Rank>(comm->nranks()); ++rank) {
-            auto buf = std::move(recv_bufs.at(
-                static_cast<std::uint64_t>(rank)
-                + i * static_cast<std::uint64_t>(comm->nranks())
-            ));
-            if (rank != comm->rank()) {
-                statistics->add_bytes_stat("all-to-all-recv", buf->size);
-                futures.push_back(comm->recv(rank, tag, std::move(buf)));
+
+    auto const t0_elapsed = Clock::now();
+    decltype(t0_elapsed - t0_elapsed) time;
+    {
+        RAPIDSMPF_NVTX_SCOPED_RANGE("Alltoall");
+        for (std::uint64_t i = 0; i < args.num_ops; ++i) {
+            for (Rank rank = 0; rank < static_cast<Rank>(comm->nranks()); ++rank) {
+                auto buf = std::move(recv_bufs.at(
+                    static_cast<std::uint64_t>(rank)
+                    + i * static_cast<std::uint64_t>(comm->nranks())
+                ));
+                if (rank != comm->rank()) {
+                    statistics->add_bytes_stat("all-to-all-recv", buf->size);
+                    futures.push_back(comm->recv(rank, tag, std::move(buf)));
+                }
+            }
+            for (Rank rank = 0; rank < static_cast<Rank>(comm->nranks()); ++rank) {
+                auto buf = std::move(send_bufs.at(
+                    static_cast<std::uint64_t>(rank)
+                    + i * static_cast<std::uint64_t>(comm->nranks())
+                ));
+                if (rank != comm->rank()) {
+                    statistics->add_bytes_stat("all-to-all-send", buf->size);
+                    futures.push_back(comm->send(std::move(buf), rank, tag));
+                }
             }
         }
-        for (Rank rank = 0; rank < static_cast<Rank>(comm->nranks()); ++rank) {
-            auto buf = std::move(send_bufs.at(
-                static_cast<std::uint64_t>(rank)
-                + i * static_cast<std::uint64_t>(comm->nranks())
-            ));
-            if (rank != comm->rank()) {
-                statistics->add_bytes_stat("all-to-all-send", buf->size);
-                futures.push_back(comm->send(std::move(buf), rank, tag));
-            }
-        }
+        auto result = comm->wait_all(std::move(futures));
+        time = Clock::now() - t0_elapsed;
     }
-    auto result = comm->wait_all(std::move(futures));
-    auto time = Clock::now() - t0_elapsed;
     return time;
 }
 
