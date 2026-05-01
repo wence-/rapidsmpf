@@ -333,7 +333,7 @@ rapidsmpf::Duration do_run(
             // stream.synchronize();
         }
     }
-
+    barrier(comm);
     auto const elapsed = rapidsmpf::Clock::now() - t0_elapsed;
 
     // Check the shuffle result (this test only works for non-empty partitions
