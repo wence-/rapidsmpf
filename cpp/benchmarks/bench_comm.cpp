@@ -255,12 +255,9 @@ Duration run(
             }
         }
     }
-
-    while (!futures.empty()) {
-        std::ignore = comm->test_some(futures);
-    }
-
-    return Clock::now() - t0_elapsed;
+    auto result = comm->wait_all(std::move(futures));
+    auto time = Clock::now() - t0_elapsed;
+    return time;
 }
 
 int main(int argc, char** argv) {
