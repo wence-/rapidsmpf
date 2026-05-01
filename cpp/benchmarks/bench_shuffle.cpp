@@ -315,18 +315,19 @@ rapidsmpf::Duration do_run(
         shuffler.wait();
         for (auto finished_partition : shuffler.local_partitions()) {
             auto packed_chunks = shuffler.extract(finished_partition);
-            auto output_partition = rapidsmpf::unpack_and_concat(
-                rapidsmpf::unspill_partitions(
-                    std::move(packed_chunks), br, rapidsmpf::AllowOverbooking::YES
-                ),
-                stream,
-                br
-            );
-            if (!args.enable_output_discard) {
-                output_partitions.emplace_back(std::move(output_partition));
-            }
-        }
-        stream.synchronize();
+            //     auto output_partition = rapidsmpf::unpack_and_concat(
+            //         rapidsmpf::unspill_partitions(
+            //             std::move(packed_chunks), br, rapidsmpf::AllowOverbooking::YES
+            //         ),
+            //         stream,
+            //         br
+            //     );
+            //     if (!args.enable_output_discard) {
+            //         output_partitions.emplace_back(std::move(output_partition));
+            //     }
+            // }
+            // stream.synchronize();
+        }            
     }
 
     auto const elapsed = rapidsmpf::Clock::now() - t0_elapsed;
