@@ -25,7 +25,8 @@ using random_data_t = std::int32_t;
 std::size_t constexpr random_table_size_lower_bound(
     cudf::size_type ncolumns, cudf::size_type nrows
 ) {
-    return static_cast<std::size_t>(ncolumns * nrows) * sizeof(random_data_t);
+    return static_cast<std::size_t>(ncolumns) * static_cast<std::size_t>(nrows)
+           * sizeof(random_data_t);
 }
 
 /**
