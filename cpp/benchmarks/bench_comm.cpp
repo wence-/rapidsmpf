@@ -206,6 +206,15 @@ class ArgumentParser {
     std::string cupti_csv_prefix;
 };
 
+void barrier(std::shared_ptr<rapidsmpf::Communicator>& comm) {
+    bool use_bootstrap = rapidsmpf::bootstrap::is_running_with_rrun();
+    if (!use_bootstrap) {
+        RAPIDSMPF_MPI(MPI_Barrier(MPI_COMM_WORLD));
+    } else {
+        std::dynamic_pointer_cast<rapidsmpf::ucxx::UCXX>(comm)->barrier();
+    }
+}
+
 Duration run(
     std::shared_ptr<Communicator> comm,
     ArgumentParser const& args,
@@ -233,6 +242,7 @@ Duration run(
     Tag const tag{0, 0};
     std::vector<std::unique_ptr<Communicator::Future>> futures;
 
+    barrier(comm);
     auto const t0_elapsed = Clock::now();
     decltype(t0_elapsed - t0_elapsed) time;
     {
@@ -260,6 +270,7 @@ Duration run(
             }
         }
         auto result = comm->wait_all(std::move(futures));
+        barrier(comm);
         time = Clock::now() - t0_elapsed;
     }
     return time;
