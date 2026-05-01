@@ -10,15 +10,19 @@
 #include <mpi.h>
 #include <unistd.h>
 
+#include <rmm/device_buffer.hpp>
+
 #include <rapidsmpf/bootstrap/bootstrap.hpp>
 #include <rapidsmpf/bootstrap/ucxx.hpp>
 #include <rapidsmpf/bootstrap/utils.hpp>
+#include <rapidsmpf/coll/allgather.hpp>
 #include <rapidsmpf/communicator/communicator.hpp>
 #include <rapidsmpf/communicator/mpi.hpp>
 #include <rapidsmpf/communicator/ucxx.hpp>
 #include <rapidsmpf/communicator/ucxx_utils.hpp>
 #include <rapidsmpf/error.hpp>
 #include <rapidsmpf/integrations/cudf/partition.hpp>
+#include <rapidsmpf/memory/packed_data.hpp>
 #include <rapidsmpf/nvtx.hpp>
 #include <rapidsmpf/progress_thread.hpp>
 #include <rapidsmpf/shuffler/shuffler.hpp>
@@ -327,7 +331,7 @@ rapidsmpf::Duration do_run(
             //     }
             // }
             // stream.synchronize();
-        }            
+        }
     }
 
     auto const elapsed = rapidsmpf::Clock::now() - t0_elapsed;
@@ -683,7 +687,25 @@ int main(int argc, char** argv) {
         }
         log->print(ss.str());
     }
-    log->print(stats->report("Statistics (of the last run):"));
+
+    {
+        auto gather = rapidsmpf::coll::AllGather(comm, 2, &br);
+        auto meta = std::make_unique<std::vector<std::uint8_t>>(stats->serialize());
+        auto data =
+            br.move(std::make_unique<rmm::device_buffer>(), rmm::cuda_stream_view{});
+        gather.insert(0, {std::move(meta), std::move(data)});
+        gather.insert_finished();
+        auto results = gather.wait_and_extract();
+        std::vector<std::shared_ptr<rapidsmpf::Statistics>> partials;
+
+        for (rapidsmpf::PackedData& pd : results) {
+            partials.push_back(rapidsmpf::Statistics::deserialize(*pd.metadata));
+        }
+        stats = rapidsmpf::Statistics::merge(partials);
+    }
+    if (comm->rank() == 0) {
+        log->print(stats->report("Global statistics (of the last run):"));
+    }
 
 #ifdef RAPIDSMPF_HAVE_CUPTI
     // Save CUPTI monitoring results to CSV file
